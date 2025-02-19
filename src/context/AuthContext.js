@@ -1,3 +1,4 @@
+// src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -14,7 +15,7 @@ export const AuthProvider = ({ children }) => {
         const initializeAuth = () => {
             const token = localStorage.getItem('token');
 
-            // Skip token check on login and google-callback pages
+            // Skip token check on login and callback pages
             if (location.pathname === '/login' || location.pathname === '/google-callback') {
                 setLoading(false);
                 return;
@@ -33,22 +34,21 @@ export const AuthProvider = ({ children }) => {
                 const decoded = jwtDecode(token);
                 setUser(decoded);
 
-                // Only redirect if we're on an incorrect page for the user's role
-                const currentPath = location.pathname;
-                if (decoded.role === 'doctor' && currentPath !== '/doctor') {
+                // Handle routing based on role
+                if (decoded.role === 'admin') {
+                    navigate('/admin');
+                } else if (decoded.role === 'doctor') {
                     navigate('/doctor');
-                } else if (decoded.role === 'organization' && currentPath !== '/organization') {
+                } else if (decoded.role === 'organization') {
                     navigate('/organization');
-                } else if (!decoded.role && !currentPath.startsWith('/register')) {
+                } else if (!decoded.role && !location.pathname.startsWith('/register')) {
                     navigate('/register');
                 }
             } catch (error) {
                 console.error('Token decode error:', error);
                 localStorage.removeItem('token');
                 setUser(null);
-                if (location.pathname !== '/login') {
-                    navigate('/login');
-                }
+                navigate('/login');
             }
             setLoading(false);
         };
@@ -62,7 +62,9 @@ export const AuthProvider = ({ children }) => {
             setUser(decoded);
             localStorage.setItem('token', token);
 
-            if (!decoded.role) {
+            if (decoded.role === 'admin') {
+                navigate('/admin');
+            } else if (!decoded.role) {
                 navigate('/register');
             } else if (decoded.role === 'doctor') {
                 navigate('/doctor');
@@ -91,20 +93,18 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const value = {
-        user,
-        loading,
-        isAuthenticated: !!user,
-        login,
-        logout
-    };
-
     if (loading) {
         return <div>Loading...</div>;
     }
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={{
+            user,
+            loading,
+            isAuthenticated: !!user,
+            login,
+            logout
+        }}>
             {children}
         </AuthContext.Provider>
     );
