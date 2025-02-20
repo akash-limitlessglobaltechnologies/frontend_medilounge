@@ -2,7 +2,7 @@
 
 export const handleDeleteAccount = async (logout, navigate) => {
     try {
-        const response = await fetch('http://localhost:5001/api/delete-account', {
+        const response = await fetch(`${process.env.REACT_APP_URI}/api/delete-account`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
