@@ -478,7 +478,7 @@ function DoctorTasks({ doctorEmail }) {
               </button>
             </div>
             <iframe 
-              src="http://localhost:3000"
+              src="https://ohifview.vercel.app"
               className="w-full h-[calc(100%-40px)]"
               title="OHIF Viewer"
               allowFullScreen
