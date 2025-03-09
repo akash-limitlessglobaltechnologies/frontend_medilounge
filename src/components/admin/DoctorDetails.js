@@ -21,7 +21,7 @@ const DoctorDetails = ({ doctor, onClose }) => {
               <p><span className="font-medium">Specialization:</span> {doctor.info.specialization}</p>
               <p><span className="font-medium">License Number:</span> {doctor.info.licenseNumber}</p>
               <p><span className="font-medium">Experience:</span> {doctor.info.experience} years</p>
-              <p><span className="font-medium">Consultation Fee:</span> ${doctor.info.consultationFee}</p>
+              <p><span className="font-medium">Consultation Fee:</span> ₹{doctor.info.consultationFee}</p>
             </div>
           </div>
 

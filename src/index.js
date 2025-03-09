@@ -1,15 +1,31 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
-import reportWebVitals from './reportWebVitals';
+import React from 'react'; 
+import ReactDOM from 'react-dom/client'; 
+import './index.css'; 
+import App from './App'; 
+import reportWebVitals from './reportWebVitals';  
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+// Prepare the environment for Cornerstone
+const prepareEnvironment = () => {
+  if (typeof window !== 'undefined') {
+    // Create cornerstone object if it doesn't exist
+    window.cornerstone = window.cornerstone || {};
+    
+    // Add any global configuration needed for OHIF
+    window.config = {
+      routerBasename: '/',
+      enableGoogleCloudAdapter: false,
+      showLoadingIndicator: true
+    };
+  }
+};
+
+// Call preparation function
+prepareEnvironment();
+
+const root = ReactDOM.createRoot(document.getElementById('root')); 
 root.render(
-
-    <App />
-
-);
+  <App />
+);  
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

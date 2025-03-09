@@ -100,7 +100,7 @@ function OrganizationPage() {
               </div>
               <div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  MediConnect
+                  Medworks
                 </span>
                 <span className="block text-xs text-gray-500">Healthcare Excellence</span>
               </div>

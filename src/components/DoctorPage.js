@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserCircle } from 'lucide-react';
+import { UserCircle, Clipboard, User } from 'lucide-react';
 import ProfileSlideOver from './DoctorProfileSlideOver';
+import DoctorDashboard from './DoctorDashboard';
+import DoctorTasks from './DoctorTasks';
 
 function DoctorPage() {
   const navigate = useNavigate();
@@ -11,6 +13,7 @@ function DoctorPage() {
   const [doctorData, setDoctorData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentView, setCurrentView] = useState('profile'); // 'profile' or 'tasks'
 
   useEffect(() => {
     fetchDoctorProfile();
@@ -80,7 +83,7 @@ function DoctorPage() {
               </div>
               <div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  MediConnect
+                  Medworks
                 </span>
                 <span className="block text-xs text-gray-500">Healthcare Excellence</span>
               </div>
@@ -98,9 +101,41 @@ function DoctorPage() {
         </div>
       </nav>
 
+      {/* Tab Navigation */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="bg-white shadow-md rounded-lg p-1 inline-flex space-x-1">
+          <button
+            onClick={() => setCurrentView('profile')}
+            className={`px-6 py-3 rounded-md flex items-center space-x-2 transition ${
+              currentView === 'profile' 
+                ? 'bg-indigo-100 text-indigo-700' 
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <User className="h-5 w-5" />
+            <span>Profile</span>
+          </button>
+          <button
+            onClick={() => setCurrentView('tasks')}
+            className={`px-6 py-3 rounded-md flex items-center space-x-2 transition ${
+              currentView === 'tasks' 
+                ? 'bg-indigo-100 text-indigo-700' 
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Clipboard className="h-5 w-5" />
+            <span>Assigned Cases</span>
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <DoctorDashboard doctorData={doctorData} />
+        {currentView === 'profile' ? (
+          <DoctorDashboard doctorData={doctorData} />
+        ) : (
+          <DoctorTasks doctorEmail={doctorData?.userId?.email} />
+        )}
       </div>
 
       {/* Profile Slide Over */}
@@ -114,71 +149,4 @@ function DoctorPage() {
     </div>
   );
 }
-
-// Doctor Dashboard Component
-function DoctorDashboard({ doctorData }) {
-  return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="bg-white rounded-2xl shadow-xl p-6">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          Welcome, Dr. {doctorData.info.fullName}
-        </h2>
-        <p className="text-gray-600 mt-2">{doctorData.info.specialization} • {doctorData.info.experience} years of experience</p>
-      </div>
-
-      {/* Professional Details */}
-      <div className="bg-white rounded-2xl shadow-xl p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Professional Bio</h3>
-        <p className="text-gray-600">{doctorData.info.professionalBio}</p>
-      </div>
-
-      {/* Qualifications */}
-      <div className="bg-white rounded-2xl shadow-xl p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Qualifications</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {doctorData.info.qualifications.map((qual, index) => (
-            <div key={index} className="bg-gray-50 rounded-xl p-4">
-              <h4 className="font-medium text-gray-900">{qual.degree}</h4>
-              <p className="text-gray-600">{qual.institution}</p>
-              <p className="text-sm text-gray-500">{qual.year}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Expertise */}
-      <div className="bg-white rounded-2xl shadow-xl p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Areas of Expertise</h3>
-        <div className="flex flex-wrap gap-2">
-          {doctorData.info.expertise.map((exp, index) => (
-            <span key={index} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
-              {exp.title}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Availability */}
-      <div className="bg-white rounded-2xl shadow-xl p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Availability</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {doctorData.info.availableDays.map((day, index) => (
-            <div key={index} className="bg-gray-50 rounded-xl p-4">
-              <h4 className="font-medium text-gray-900">{day}</h4>
-              <div className="mt-2 space-y-1">
-                {doctorData.info.timeSlots.map((slot, slotIndex) => (
-                  <p key={slotIndex} className="text-sm text-gray-600">
-                    {slot.startTime} - {slot.endTime}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default DoctorPage;

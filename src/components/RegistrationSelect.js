@@ -70,7 +70,7 @@ function RegistrationSelect() {
                             </div>
                             <div>
                                 <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                    MediConnect
+                                    Medworks
                                 </span>
                                 <span className="block text-xs text-gray-500">Healthcare Excellence</span>
                             </div>
@@ -94,7 +94,7 @@ function RegistrationSelect() {
                         <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
                             Choose Registration Type
                         </h1>
-                        <p className="text-gray-600">Select how you would like to register with MediConnect</p>
+                        <p className="text-gray-600">Select how you would like to register with Medworks</p>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8">

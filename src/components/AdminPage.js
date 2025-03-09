@@ -132,7 +132,7 @@ function AdminPage() {
                 <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   Admin Dashboard
                 </span>
-                <span className="block text-xs text-gray-500">MediConnect Management</span>
+                <span className="block text-xs text-gray-500">Medworks Management</span>
               </div>
             </div>
 
