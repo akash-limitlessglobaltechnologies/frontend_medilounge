@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, AlertCircle, Clipboard, ExternalLink, Download, FileType, Image, File, Folder, FileImage, FileText, Copy, CheckCheck } from 'lucide-react';
+import DicomViewer from './DicomViewer';
+import ImageViewer from './ImageViewer';
 
 function DoctorTasks({ doctorEmail }) {
   const [assignments, setAssignments] = useState([]);
@@ -9,7 +11,8 @@ function DoctorTasks({ doctorEmail }) {
   const [taskNotes, setTaskNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [showOhifViewer, setShowOhifViewer] = useState(false);
+  const [showDicomViewer, setShowDicomViewer] = useState(false);
+  const [showImageViewer, setShowImageViewer] = useState(false);
   const [hasFile, setHasFile] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState('');
@@ -99,7 +102,8 @@ function DoctorTasks({ doctorEmail }) {
     // Set notes from the link if available
     setTaskNotes(link.notes || '');
     setSaveSuccess(false);
-    setShowOhifViewer(false); // Hide viewer when opening a new task
+    setShowDicomViewer(false); // Hide viewers when opening a new task
+    setShowImageViewer(false);
   };
 
   const handleTaskAction = async (action) => {
@@ -382,12 +386,22 @@ function DoctorTasks({ doctorEmail }) {
     };
   };
 
-  const handleOpenOhifViewer = () => {
-    setShowOhifViewer(true);
+  const handleOpenDicomViewer = () => {
+    setShowDicomViewer(true);
+    setShowImageViewer(false);
   };
 
-  const handleCloseOhifViewer = () => {
-    setShowOhifViewer(false);
+  const handleCloseDicomViewer = () => {
+    setShowDicomViewer(false);
+  };
+  
+  const handleOpenImageViewer = () => {
+    setShowImageViewer(true);
+    setShowDicomViewer(false);
+  };
+  
+  const handleCloseImageViewer = () => {
+    setShowImageViewer(false);
   };
 
   const downloadFile = () => {
@@ -401,6 +415,18 @@ function DoctorTasks({ doctorEmail }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Check if file is an image
+  const isImageFile = (fileType) => {
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'];
+    return imageTypes.includes(fileType?.toLowerCase());
+  };
+  
+  // Check if file is a DICOM file
+  const isDicomFile = (fileType) => {
+    const dicomTypes = ['dcm', 'dicom'];
+    return dicomTypes.includes(fileType?.toLowerCase());
   };
 
   // Get file icon based on file type
@@ -462,29 +488,21 @@ function DoctorTasks({ doctorEmail }) {
         </p>
       </div>
 
-      {/* OHIF Viewer Modal */}
-      {showOhifViewer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="relative w-full h-full max-w-[90%] max-h-[90%] bg-white rounded-lg">
-            <div className="flex justify-between items-center p-2 border-b">
-              <h3 className="text-lg font-medium">DICOM Viewer</h3>
-              <button 
-                onClick={handleCloseOhifViewer}
-                className="p-1 rounded-full hover:bg-gray-200"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <iframe 
-              src="https://ohifview.vercel.app"
-              className="w-full h-[calc(100%-40px)]"
-              title="OHIF Viewer"
-              allowFullScreen
-            ></iframe>
-          </div>
-        </div>
+      {/* DICOM Viewer Modal */}
+      {showDicomViewer && (
+        <DicomViewer 
+          onClose={handleCloseDicomViewer} 
+          dicomUrl={activeTask?.linkUrl}
+        />
+      )}
+      
+      {/* Image Viewer Modal */}
+      {showImageViewer && (
+        <ImageViewer 
+          onClose={handleCloseImageViewer} 
+          imageUrl={downloadUrl}
+          imageName={fileName}
+        />
       )}
 
       {/* Task View */}
@@ -660,11 +678,18 @@ function DoctorTasks({ doctorEmail }) {
                       {isSaving ? 'Saving...' : 'Mark as Complete'}
                     </button>
                     <button
-                      onClick={handleOpenOhifViewer}
-                      className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center"
+                      onClick={handleOpenDicomViewer}
+                      className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center justify-center"
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Open DICOM Viewer
+                    </button>
+                    <button
+                      onClick={handleOpenImageViewer}
+                      className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open Image Viewer
                     </button>
                   </div>
                 </>
