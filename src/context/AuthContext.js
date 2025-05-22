@@ -1,4 +1,3 @@
-// src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -41,6 +40,8 @@ export const AuthProvider = ({ children }) => {
                     navigate('/doctor');
                 } else if (decoded.role === 'organization') {
                     navigate('/organization');
+                } else if (decoded.role === 'aicompany') {
+                    navigate('/aicompany');
                 } else if (!decoded.role && !location.pathname.startsWith('/register')) {
                     navigate('/register');
                 }
@@ -70,6 +71,8 @@ export const AuthProvider = ({ children }) => {
                 navigate('/doctor');
             } else if (decoded.role === 'organization') {
                 navigate('/organization');
+            } else if (decoded.role === 'aicompany') {
+                navigate('/aicompany');
             }
         } catch (error) {
             console.error('Login error:', error);

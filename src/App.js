@@ -6,60 +6,17 @@ import Login from './components/Login';
 import GoogleCallback from './components/GoogleCallback';
 import DoctorPage from './components/DoctorPage';
 import OrganizationPage from './components/OrganizationPage';
+import AICompanyPage from './components/AICompanyPage';
 import AdminPage from './components/AdminPage';
 import RegistrationSelect from './components/RegistrationSelect';
 import DoctorRegistration from './components/DoctorRegistration';
 import OrganizationRegistration from './components/OrganizationRegistration';
+import AICompanyRegistration from './components/AICompanyRegistration';
 import PrivateRoute from './components/PrivateRoute';
-
-// Import Cornerstone libraries
-import * as cornerstone from 'cornerstone-core';
-import * as cornerstoneTools from 'cornerstone-tools';
-import * as cornerstoneMath from 'cornerstone-math';
-import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader';
-import dicomParser from 'dicom-parser';
-
-// Initialize Cornerstone once at the app level
-const initCornerstone = () => {
-    try {
-        // Set external dependencies
-        cornerstoneTools.external.cornerstone = cornerstone;
-        cornerstoneTools.external.cornerstoneMath = cornerstoneMath;
-        cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
-        cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-
-        // Configure webworkers
-        cornerstoneWADOImageLoader.webWorkerManager.initialize({
-            maxWebWorkers: navigator.hardwareConcurrency || 1,
-            startWebWorkersOnDemand: true,
-        });
-
-        // Register image loaders
-        cornerstone.registerImageLoader('http', cornerstoneWADOImageLoader.loadImage);
-        cornerstone.registerImageLoader('https', cornerstoneWADOImageLoader.loadImage);
-        cornerstone.registerImageLoader('wadouri', cornerstoneWADOImageLoader.wadouri.loadImage);
-        cornerstone.registerImageLoader('dicomweb', cornerstoneWADOImageLoader.wadors.loadImage);
-
-        // Configure WADO image loader
-        cornerstoneWADOImageLoader.configure({
-            useWebWorkers: true,
-            decodeConfig: {
-                convertFloatPixelDataToInt: false,
-                use16Bits: true
-            }
-        });
-
-        console.log('Cornerstone initialized successfully');
-    } catch (error) {
-        console.error('Error initializing Cornerstone:', error);
-    }
-};
+import S3Viewer from './components/S3Viewer';
 
 function App() {
     useEffect(() => {
-        // Initialize Cornerstone libraries
-        initCornerstone();
-        
         const handleUnload = () => {
             if (!localStorage.getItem('token')) return;
             
@@ -115,6 +72,14 @@ function App() {
                                 </PrivateRoute>
                             } 
                         />
+                        <Route 
+                            path="/register/aicompany" 
+                            element={
+                                <PrivateRoute allowedRoles={[null]}>
+                                    <AICompanyRegistration />
+                                </PrivateRoute>
+                            } 
+                        />
                         
                         {/* Role-Protected Routes */}
                         <Route 
@@ -130,6 +95,22 @@ function App() {
                             element={
                                 <PrivateRoute allowedRoles={['organization']}>
                                     <OrganizationPage />
+                                </PrivateRoute>
+                            } 
+                        />
+                        <Route 
+                            path="/aicompany" 
+                            element={
+                                <PrivateRoute allowedRoles={['aicompany']}>
+                                    <AICompanyPage />
+                                </PrivateRoute>
+                            } 
+                        />
+                        <Route 
+                            path="/s3-viewer" 
+                            element={
+                                <PrivateRoute>
+                                    <S3Viewer />
                                 </PrivateRoute>
                             } 
                         />
@@ -153,6 +134,7 @@ function App() {
                                         if (user.role === 'admin') return <Navigate to="/admin" />;
                                         if (user.role === 'doctor') return <Navigate to="/doctor" />;
                                         if (user.role === 'organization') return <Navigate to="/organization" />;
+                                        if (user.role === 'aicompany') return <Navigate to="/aicompany" />;
                                         return <Navigate to="/login" />;
                                     }}
                                 </PrivateRoute>

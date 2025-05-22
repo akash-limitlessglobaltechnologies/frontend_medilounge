@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize, Minimize, 
   Upload, Link, X, Lock, Unlock, Trash2, Edit, Eye, EyeOff,
@@ -10,11 +10,20 @@ import ImageUploader from './ImageUploader';
 import PasskeyModal from './PasskeyModal';
 import axios from 'axios';
 
-const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialImageName }) => {
+const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialImageName, initialPasskey = null }) => {
+  // Refs for performance optimization
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
+  const containerRef = useRef(null);
+  const annotationsUpdatedRef = useRef(false);
+  const animationFrameRef = useRef(null);
+  const lastMousePosition = useRef({ x: 0, y: 0 });
+  const lastRenderTime = useRef(0);
+  
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showPasskeyModal, setShowPasskeyModal] = useState(true);
-  const [passkey, setPasskey] = useState('');
+  const [showPasskeyModal, setShowPasskeyModal] = useState(!initialPasskey);
+  const [passkey, setPasskey] = useState(initialPasskey || '');
   
   // Image state
   const [scale, setScale] = useState(1);
@@ -23,6 +32,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
   const [imageUrl, setImageUrl] = useState(initialImageUrl || '/api/placeholder/800/600');
   const [imageName, setImageName] = useState(initialImageName || 'Image');
   const [showImageUploader, setShowImageUploader] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   
   // Annotation state
   const [annotations, setAnnotations] = useState([]);
@@ -36,15 +46,32 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState(null); // 'move', 'resize', etc.
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  
-  // Refs
-  const canvasRef = useRef(null);
-  const imageRef = useRef(null);
-  const containerRef = useRef(null);
-  const annotationsUpdatedRef = useRef(false);
+
+  // Monitor fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Initialize with initial passkey if provided
+  useEffect(() => {
+    if (initialPasskey && validatePasskey(initialPasskey)) {
+      handlePasskeySubmit(initialPasskey);
+    }
+  }, [initialPasskey]);
+
+  // Validate passkey format (12 digits, alphanumeric)
+  const validatePasskey = useCallback((key) => {
+    const passkeyRegex = /^[a-zA-Z0-9]{12}$/;
+    return passkeyRegex.test(key);
+  }, []);
 
   // Authenticate user with passkey
-  const handlePasskeySubmit = async (submittedPasskey) => {
+  const handlePasskeySubmit = useCallback(async (submittedPasskey) => {
     if (validatePasskey(submittedPasskey)) {
       setPasskey(submittedPasskey);
       setIsAuthenticated(true);
@@ -65,16 +92,10 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     } else {
       alert('Invalid passkey. Please enter a valid 12-digit alphanumeric passkey.');
     }
-  };
+  }, [validatePasskey]);
 
-  // Validate passkey format (12 digits, alphanumeric)
-  const validatePasskey = (key) => {
-    const passkeyRegex = /^[a-zA-Z0-9]{12}$/;
-    return passkeyRegex.test(key);
-  };
-
-  // Save annotations to the API
-  const saveAnnotations = async () => {
+  // Save annotations to the API (debounced)
+  const saveAnnotations = useCallback(async () => {
     if (!isAuthenticated || !passkey) return;
     
     try {
@@ -88,27 +109,37 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     } catch (error) {
       console.error('Error saving annotations:', error);
     }
-  };
+  }, [isAuthenticated, passkey, imageName, imageUrl, annotations]);
+
+  // Debounced save
+  useEffect(() => {
+    if (annotationsUpdatedRef.current) {
+      const timer = setTimeout(() => {
+        saveAnnotations();
+      }, 1000); // Debounce for 1 second
+      
+      return () => clearTimeout(timer);
+    }
+  }, [annotations, saveAnnotations]);
 
   // Handle image operations
-  const handleZoomIn = () => {
+  const handleZoomIn = useCallback(() => {
     setScale(prev => Math.min(prev + 0.1, 3));
-  };
+  }, []);
 
-  const handleZoomOut = () => {
+  const handleZoomOut = useCallback(() => {
     setScale(prev => Math.max(prev - 0.1, 0.5));
-  };
+  }, []);
 
-  const handleRotateClockwise = () => {
+  const handleRotateClockwise = useCallback(() => {
     setRotation(prev => prev + 90);
-  };
+  }, []);
 
-  const handleRotateCounterClockwise = () => {
+  const handleRotateCounterClockwise = useCallback(() => {
     setRotation(prev => prev - 90);
-  };
+  }, []);
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  const toggleFullscreen = useCallback(() => {
     if (!isFullscreen) {
       if (containerRef.current.requestFullscreen) {
         containerRef.current.requestFullscreen();
@@ -118,24 +149,24 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
         document.exitFullscreen();
       }
     }
-  };
+  }, [isFullscreen]);
 
   // Handle image upload and URL setting
-  const handleImageUpload = (file) => {
+  const handleImageUpload = useCallback((file) => {
     const url = URL.createObjectURL(file);
     setImageUrl(url);
     setImageName(file.name);
     setShowImageUploader(false);
-  };
+  }, []);
 
-  const handleImageUrlSubmit = (url, name) => {
+  const handleImageUrlSubmit = useCallback((url, name) => {
     setImageUrl(url);
     setImageName(name || 'Remote Image');
     setShowImageUploader(false);
-  };
+  }, []);
 
-  // Get handle or point at position
-  const getHandleAtPosition = (annotation, x, y) => {
+  // Helper functions for annotation interaction
+  const getHandleAtPosition = useCallback((annotation, x, y) => {
     const handleSize = 10; // Size of hit area for handles
 
     // Check for endpoints of bidirectional
@@ -193,9 +224,9 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     }
     
     return null;
-  };
+  }, []);
 
-  const getAnnotationAtPosition = (x, y) => {
+  const getAnnotationAtPosition = useCallback((x, y) => {
     // Check from top to bottom in z-order
     for (let i = annotations.length - 1; i >= 0; i--) {
       const anno = annotations[i];
@@ -264,23 +295,26 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     }
     
     return null;
-  };
+  }, [annotations]);
 
-  // Annotation handling
-  const startDrawing = (type) => {
+  // Drawing functions
+  const startDrawing = useCallback((type) => {
     setCurrentAnnotationType(type);
     setIsDrawing(true);
-  };
+  }, []);
 
-  const stopDrawing = () => {
+  const stopDrawing = useCallback(() => {
     setIsDrawing(false);
     setCurrentAnnotationType(null);
     
     // Mark annotations as updated
     annotationsUpdatedRef.current = true;
-  };
+  }, []);
 
-  const handleCanvasClick = (e) => {
+  // Canvas event handlers
+  const handleCanvasClick = useCallback((e) => {
+    if (!canvasRef.current) return;
+    
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / scale;
     const y = (e.clientY - rect.top) / scale;
@@ -336,7 +370,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
             points: [[x, y]]
           };
           
-          setAnnotations([...annotations, newAnnotation]);
+          setAnnotations(prev => [...prev, newAnnotation]);
           setActiveAnnotation(newAnnotation.id);
           
           // Mark annotations as updated
@@ -357,7 +391,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
           locked: false
         };
         
-        setAnnotations([...annotations, newAnnotation]);
+        setAnnotations(prev => [...prev, newAnnotation]);
         setActiveAnnotation(newAnnotation.id);
         stopDrawing();
         
@@ -369,10 +403,19 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
       const clickedAnnotation = getAnnotationAtPosition(x, y);
       setActiveAnnotation(clickedAnnotation ? clickedAnnotation.id : null);
     }
-  };
+  }, [
+    isDrawing, 
+    currentAnnotationType, 
+    activeAnnotation, 
+    annotations, 
+    annotationColor, 
+    scale, 
+    getAnnotationAtPosition, 
+    stopDrawing
+  ]);
 
-  const handleMouseDown = (e) => {
-    if (activeAnnotation === null || isDrawing) return;
+  const handleMouseDown = useCallback((e) => {
+    if (activeAnnotation === null || isDrawing || !canvasRef.current) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / scale;
@@ -394,157 +437,195 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
       setIsDragging(true);
       e.preventDefault();
     }
-  };
+    
+    // Store current mouse position for throttled updates
+    lastMousePosition.current = { x, y };
+  }, [
+    activeAnnotation, 
+    isDrawing, 
+    scale, 
+    annotations, 
+    getHandleAtPosition, 
+    getAnnotationAtPosition
+  ]);
 
-  const handleMouseMove = (e) => {
+  // Optimized mouse move handler with requestAnimationFrame
+  const handleMouseMove = useCallback((e) => {
+    if (!canvasRef.current) return;
+    
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / scale;
     const y = (e.clientY - rect.top) / scale;
     
-    if (isDrawing) {
-      if (['bidirectional'].includes(currentAnnotationType)) {
-        // Show a preview of the line being drawn
-        const activeAnno = annotations.find(a => a.id === activeAnnotation && !a.complete);
-        if (activeAnno) {
-          // Update the preview point
+    // Store current mouse position for animation frame updates
+    lastMousePosition.current = { x, y };
+    
+    // Only schedule a new frame if we don't have one pending
+    if (!animationFrameRef.current) {
+      animationFrameRef.current = requestAnimationFrame(() => {
+        animationFrameRef.current = null;
+        
+        // Get the latest mouse position from the ref
+        const { x, y } = lastMousePosition.current;
+        
+        if (isDrawing) {
+          if (['bidirectional'].includes(currentAnnotationType)) {
+            // Show a preview of the line being drawn
+            const activeAnno = annotations.find(a => a.id === activeAnnotation && !a.complete);
+            if (activeAnno) {
+              // Update the preview point
+              setAnnotations(prevAnnotations => {
+                return prevAnnotations.map(anno => {
+                  if (anno.id === activeAnnotation) {
+                    if (currentAnnotationType === 'bidirectional') {
+                      if (anno.points.length === 1) {
+                        // Preview second point
+                        return {
+                          ...anno,
+                          previewPoint: [x, y]
+                        };
+                      } else if (anno.points.length === 3) {
+                        // Preview fourth point
+                        return {
+                          ...anno,
+                          previewPoint: [x, y]
+                        };
+                      }
+                    }
+                  }
+                  return anno;
+                });
+              });
+            }
+          }
+        } else if (isDragging && activeAnnotation !== null) {
+          // Handle moving or resizing annotations
           setAnnotations(prevAnnotations => {
             return prevAnnotations.map(anno => {
-              if (anno.id === activeAnnotation) {
-                if (currentAnnotationType === 'bidirectional') {
-                  if (anno.points.length === 1) {
-                    // Preview second point
-                    return {
-                      ...anno,
-                      previewPoint: [x, y]
-                    };
-                  } else if (anno.points.length === 3) {
-                    // Preview fourth point
-                    return {
-                      ...anno,
-                      previewPoint: [x, y]
-                    };
+              if (anno.id !== activeAnnotation) return anno;
+              
+              const deltaX = x - dragStartPos.x;
+              const deltaY = y - dragStartPos.y;
+              
+              // Clone annotation for modifications
+              const updated = { ...anno };
+              
+              // For bidirectional, ensure we have a central reference point
+              if (anno.type === 'bidirectional' && !anno.hasOwnProperty('x')) {
+                if (anno.points && anno.points.length > 0) {
+                  // For bidirectional, use the midpoint of the first line
+                  if (anno.type === 'bidirectional' && anno.points.length >= 4) {
+                    updated.x = (anno.points[0][0] + anno.points[1][0]) / 2;
+                    updated.y = (anno.points[0][1] + anno.points[1][1]) / 2;
                   }
                 }
               }
-              return anno;
+              
+              if (dragMode === 'move') {
+                // Move the entire annotation
+                if (anno.points) {
+                  // For line-based annotations, move all points
+                  updated.points = anno.points.map(([px, py]) => [px + deltaX, py + deltaY]);
+                  
+                  // Update the center reference if it exists
+                  if (anno.hasOwnProperty('x')) {
+                    updated.x += deltaX;
+                    updated.y += deltaY;
+                  }
+                } else {
+                  // For shape annotations
+                  updated.x += deltaX;
+                  updated.y += deltaY;
+                }
+              } else if (dragMode === 'center') {
+                // Move the center point for shapes
+                if (!anno.points) {
+                  updated.x = x;
+                  updated.y = y;
+                }
+              } else if (anno.type === 'circle') {
+                // Resize circle based on cardinal point
+                const minRadius = 10;
+                
+                if (dragMode === 'right') {
+                  updated.radius = Math.max(minRadius, Math.abs(x - anno.x));
+                } else if (dragMode === 'left') {
+                  updated.radius = Math.max(minRadius, Math.abs(anno.x - x));
+                } else if (dragMode === 'top') {
+                  updated.radius = Math.max(minRadius, Math.abs(anno.y - y));
+                } else if (dragMode === 'bottom') {
+                  updated.radius = Math.max(minRadius, Math.abs(y - anno.y));
+                }
+              } else if (anno.type === 'rectangle' || anno.type === 'ellipse') {
+                // Resize rectangle or ellipse
+                const minSize = 10;
+                
+                if (dragMode === 'right') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
+                } else if (dragMode === 'left') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
+                } else if (dragMode === 'top') {
+                  updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
+                } else if (dragMode === 'bottom') {
+                  updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
+                } else if (dragMode === 'topright') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
+                  updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
+                } else if (dragMode === 'topleft') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
+                  updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
+                } else if (dragMode === 'bottomright') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
+                  updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
+                } else if (dragMode === 'bottomleft') {
+                  updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
+                  updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
+                }
+              } else if (anno.type === 'bidirectional' && anno.points?.length === 4) {
+                // Allow editing the endpoints of both lines
+                if (dragMode === 'endpoint-0') {
+                  updated.points = [[x, y], anno.points[1], anno.points[2], anno.points[3]];
+                } else if (dragMode === 'endpoint-1') {
+                  updated.points = [anno.points[0], [x, y], anno.points[2], anno.points[3]];
+                } else if (dragMode === 'endpoint-2') {
+                  updated.points = [anno.points[0], anno.points[1], [x, y], anno.points[3]];
+                } else if (dragMode === 'endpoint-3') {
+                  updated.points = [anno.points[0], anno.points[1], anno.points[2], [x, y]];
+                }
+                
+                // Update center reference point
+                if (updated.hasOwnProperty('x')) {
+                  updated.x = (updated.points[0][0] + updated.points[1][0]) / 2;
+                  updated.y = (updated.points[0][1] + updated.points[1][1]) / 2;
+                }
+              }
+              
+              return updated;
             });
           });
+          
+          setDragStartPos({ x, y });
+          
+          // Mark annotations as updated when dragging
+          annotationsUpdatedRef.current = true;
         }
-      }
-    } else if (isDragging && activeAnnotation !== null) {
-      // Handle moving or resizing annotations
-      setAnnotations(prevAnnotations => {
-        return prevAnnotations.map(anno => {
-          if (anno.id !== activeAnnotation) return anno;
-          
-          const deltaX = x - dragStartPos.x;
-          const deltaY = y - dragStartPos.y;
-          
-          // Clone annotation for modifications
-          const updated = { ...anno };
-          
-          // For bidirectional, ensure we have a central reference point
-          if (anno.type === 'bidirectional' && !anno.hasOwnProperty('x')) {
-            if (anno.points && anno.points.length > 0) {
-              // For bidirectional, use the midpoint of the first line
-              if (anno.type === 'bidirectional' && anno.points.length >= 4) {
-                updated.x = (anno.points[0][0] + anno.points[1][0]) / 2;
-                updated.y = (anno.points[0][1] + anno.points[1][1]) / 2;
-              }
-            }
-          }
-          
-          if (dragMode === 'move') {
-            // Move the entire annotation
-            if (anno.points) {
-              // For line-based annotations, move all points
-              updated.points = anno.points.map(([px, py]) => [px + deltaX, py + deltaY]);
-              
-              // Update the center reference if it exists
-              if (anno.hasOwnProperty('x')) {
-                updated.x += deltaX;
-                updated.y += deltaY;
-              }
-            } else {
-              // For shape annotations
-              updated.x += deltaX;
-              updated.y += deltaY;
-            }
-          } else if (dragMode === 'center') {
-            // Move the center point for shapes
-            if (!anno.points) {
-              updated.x = x;
-              updated.y = y;
-            }
-          } else if (anno.type === 'circle') {
-            // Resize circle based on cardinal point
-            const minRadius = 10;
-            
-            if (dragMode === 'right') {
-              updated.radius = Math.max(minRadius, Math.abs(x - anno.x));
-            } else if (dragMode === 'left') {
-              updated.radius = Math.max(minRadius, Math.abs(anno.x - x));
-            } else if (dragMode === 'top') {
-              updated.radius = Math.max(minRadius, Math.abs(anno.y - y));
-            } else if (dragMode === 'bottom') {
-              updated.radius = Math.max(minRadius, Math.abs(y - anno.y));
-            }
-          } else if (anno.type === 'rectangle' || anno.type === 'ellipse') {
-            // Resize rectangle or ellipse
-            const minSize = 10;
-            
-            if (dragMode === 'right') {
-              updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
-            } else if (dragMode === 'left') {
-              updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
-            } else if (dragMode === 'top') {
-              updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
-            } else if (dragMode === 'bottom') {
-              updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
-            } else if (dragMode === 'topright') {
-              updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
-              updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
-            } else if (dragMode === 'topleft') {
-              updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
-              updated.height = Math.max(minSize, 2 * Math.abs(anno.y - y));
-            } else if (dragMode === 'bottomright') {
-              updated.width = Math.max(minSize, 2 * Math.abs(x - anno.x));
-              updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
-            } else if (dragMode === 'bottomleft') {
-              updated.width = Math.max(minSize, 2 * Math.abs(anno.x - x));
-              updated.height = Math.max(minSize, 2 * Math.abs(y - anno.y));
-            }
-          } else if (anno.type === 'bidirectional' && anno.points?.length === 4) {
-            // Allow editing the endpoints of both lines
-            if (dragMode === 'endpoint-0') {
-              updated.points = [[x, y], anno.points[1], anno.points[2], anno.points[3]];
-            } else if (dragMode === 'endpoint-1') {
-              updated.points = [anno.points[0], [x, y], anno.points[2], anno.points[3]];
-            } else if (dragMode === 'endpoint-2') {
-              updated.points = [anno.points[0], anno.points[1], [x, y], anno.points[3]];
-            } else if (dragMode === 'endpoint-3') {
-              updated.points = [anno.points[0], anno.points[1], anno.points[2], [x, y]];
-            }
-            
-            // Update center reference point
-            if (updated.hasOwnProperty('x')) {
-              updated.x = (updated.points[0][0] + updated.points[1][0]) / 2;
-              updated.y = (updated.points[0][1] + updated.points[1][1]) / 2;
-            }
-          }
-          
-          return updated;
-        });
+        
+        // Update canvas if needed
+        renderCanvas();
       });
-      
-      setDragStartPos({ x, y });
-      
-      // Mark annotations as updated when dragging
-      annotationsUpdatedRef.current = true;
     }
-  };
+  }, [
+    isDrawing, 
+    isDragging, 
+    activeAnnotation, 
+    annotations, 
+    currentAnnotationType, 
+    dragMode, 
+    dragStartPos, 
+    scale
+  ]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
       setDragMode(null);
@@ -554,9 +635,10 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
         saveAnnotations();
       }
     }
-  };
+  }, [isDragging, saveAnnotations]);
 
-  const updateAnnotation = (id, updates) => {
+  // Annotation operations
+  const updateAnnotation = useCallback((id, updates) => {
     setAnnotations(prevAnnotations => 
       prevAnnotations.map(anno => 
         anno.id === id ? { ...anno, ...updates } : anno
@@ -568,9 +650,9 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     
     // Save annotations after update
     setTimeout(saveAnnotations, 100);
-  };
+  }, [saveAnnotations]);
 
-  const deleteAnnotation = (id) => {
+  const deleteAnnotation = useCallback((id) => {
     setAnnotations(prevAnnotations => prevAnnotations.filter(anno => anno.id !== id));
     if (activeAnnotation === id) {
       setActiveAnnotation(null);
@@ -581,9 +663,9 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     
     // Save annotations after deletion
     setTimeout(saveAnnotations, 100);
-  };
+  }, [activeAnnotation, saveAnnotations]);
 
-  const toggleAnnotationLock = (id) => {
+  const toggleAnnotationLock = useCallback((id) => {
     setAnnotations(prevAnnotations => 
       prevAnnotations.map(anno => 
         anno.id === id ? { ...anno, locked: !anno.locked } : anno
@@ -595,9 +677,10 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     
     // Save annotations after locking/unlocking
     setTimeout(saveAnnotations, 100);
-  };
+  }, [saveAnnotations]);
 
-  const calculateArea = (annotation) => {
+  // Measurement calculations
+  const calculateArea = useCallback((annotation) => {
     if (annotation.type === 'circle') {
       return Math.PI * Math.pow(annotation.radius, 2);
     } else if (annotation.type === 'rectangle') {
@@ -606,21 +689,10 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
       return Math.PI * (annotation.width / 2) * (annotation.height / 2);
     }
     return 0;
-  };
+  }, []);
 
-  // Save annotations when they're updated (debounced)
-  useEffect(() => {
-    if (annotationsUpdatedRef.current) {
-      const timer = setTimeout(() => {
-        saveAnnotations();
-      }, 1000); // Debounce for 1 second
-      
-      return () => clearTimeout(timer);
-    }
-  }, [annotations]);
-
-  // Render annotations on canvas
-  useEffect(() => {
+  // Optimized canvas rendering
+  const renderCanvas = useCallback(() => {
     if (!canvasRef.current || !showAnnotations) return;
     
     const canvas = canvasRef.current;
@@ -825,17 +897,46 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
         }
       }
     });
-  }, [annotations, activeAnnotation, showAnnotations, isDragging, isDrawing]);
+  }, [
+    activeAnnotation, 
+    annotations, 
+    isDrawing, 
+    isDragging, 
+    showAnnotations, 
+    calculateArea
+  ]);
 
-  // Resize canvas when image loads
+  // Re-render canvas when critical state changes
   useEffect(() => {
-    const handleImageLoad = () => {
-      if (canvasRef.current && imageRef.current) {
-        canvasRef.current.width = imageRef.current.naturalWidth;
-        canvasRef.current.height = imageRef.current.naturalHeight;
+    renderCanvas();
+  }, [
+    annotations, 
+    activeAnnotation, 
+    showAnnotations, 
+    isDrawing, 
+    isDragging, 
+    renderCanvas
+  ]);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
+  }, []);
 
+  // Resize canvas when image loads
+  const handleImageLoad = useCallback(() => {
+    if (canvasRef.current && imageRef.current) {
+      canvasRef.current.width = imageRef.current.naturalWidth;
+      canvasRef.current.height = imageRef.current.naturalHeight;
+      setImageLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const img = imageRef.current;
     if (img) {
       if (img.complete) {
@@ -847,7 +948,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
         };
       }
     }
-  }, [imageUrl]);
+  }, [imageUrl, handleImageLoad]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -856,6 +957,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
         <PasskeyModal 
           onSubmit={handlePasskeySubmit}
           onClose={onClose} 
+          initialPasskey={initialPasskey}
         />
       )}
       
@@ -906,10 +1008,15 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
             
             {/* Main Image Area */}
             <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center">
+              {!imageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-indigo-500 border-gray-700"></div>
+                </div>
+              )}
               <div 
                 style={{ 
                   transform: `scale(${scale}) rotate(${rotation}deg)`,
-                  transition: 'transform 0.3s ease'
+                  transition: 'transform 0.2s ease'
                 }}
                 className="relative"
               >
@@ -999,4 +1106,4 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
   );
 };
 
-export default ImageViewer;
+export default React.memo(ImageViewer);

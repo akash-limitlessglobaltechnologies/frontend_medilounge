@@ -10,7 +10,10 @@ import {
     ClipboardList,
     Shield,
     ArrowLeft,
-    Loader
+    Cpu,
+    Brain,
+    Database,
+    Lock
 } from 'lucide-react';
 
 function RegistrationSelect() {
@@ -22,6 +25,8 @@ function RegistrationSelect() {
             navigate('/doctor');
         } else if (user?.role === 'organization') {
             navigate('/organization');
+        } else if (user?.role === 'aicompany') {
+            navigate('/aicompany');
         }
     }, [user, navigate]);
 
@@ -31,6 +36,8 @@ function RegistrationSelect() {
             navigate('/register/doctor');
         } else if (role === 'organization') {
             navigate('/register/organization');
+        } else if (role === 'aicompany') {
+            navigate('/register/aicompany');
         }
     };
 
@@ -53,9 +60,6 @@ function RegistrationSelect() {
             <nav className="bg-white/80 backdrop-blur-md shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
-                        {/* Back Button */}
-                       
-
                         {/* Logo and Title */}
                         <div className="flex items-center space-x-4">
                             <div className="relative">
@@ -89,7 +93,7 @@ function RegistrationSelect() {
 
             {/* Main Content */}
             <div className="flex items-center justify-center min-h-[calc(100vh-5rem)] px-4 py-12">
-                <div className="max-w-4xl w-full">
+                <div className="max-w-5xl w-full">
                     <div className="text-center mb-8">
                         <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
                             Choose Registration Type
@@ -97,7 +101,7 @@ function RegistrationSelect() {
                         <p className="text-gray-600">Select how you would like to register with Medworks</p>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-8">
+                    <div className="grid md:grid-cols-3 gap-6">
                         {/* Doctor Card */}
                         <div className="relative group">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
@@ -180,6 +184,50 @@ function RegistrationSelect() {
                                         <div className="flex items-center space-x-2">
                                             <Shield className="h-5 w-5 text-indigo-600" />
                                             <span className="text-sm text-gray-600">Compliance</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* AI Company Card */}
+                        <div className="relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                            <button
+                                onClick={() => handleRoleSelection('aicompany')}
+                                className="relative w-full bg-white rounded-2xl p-6 shadow-xl transition-all duration-200 hover:shadow-2xl"
+                            >
+                                <div className="absolute top-6 right-6 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ChevronRight className="h-6 w-6" />
+                                </div>
+                                
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="relative mb-6">
+                                        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full blur opacity-30"></div>
+                                        <div className="relative bg-white rounded-full p-4 shadow-lg">
+                                            <Cpu className="h-12 w-12 text-indigo-600" />
+                                        </div>
+                                    </div>
+                                    
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Register as AI Company</h2>
+                                    <p className="text-gray-600 mb-6">Integrate your AI solutions with healthcare</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 text-left">
+                                        <div className="flex items-center space-x-2">
+                                            <Brain className="h-5 w-5 text-indigo-600" />
+                                            <span className="text-sm text-gray-600">AI Integration</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Database className="h-5 w-5 text-indigo-600" />
+                                            <span className="text-sm text-gray-600">Data Analytics</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Activity className="h-5 w-5 text-indigo-600" />
+                                            <span className="text-sm text-gray-600">Performance Metrics</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Lock className="h-5 w-5 text-indigo-600" />
+                                            <span className="text-sm text-gray-600">Secure API Access</span>
                                         </div>
                                     </div>
                                 </div>

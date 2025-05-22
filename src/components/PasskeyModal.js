@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Key, AlertTriangle, X } from 'lucide-react';
 
-const PasskeyModal = ({ onSubmit, onClose = () => {} }) => {
-  const [passkey, setPasskey] = useState('');
+const PasskeyModal = ({ onSubmit, onClose = () => {}, initialPasskey = null }) => {
+  const [passkey, setPasskey] = useState(initialPasskey || '');
   const [error, setError] = useState('');
+  
+  // Auto-submit when initialPasskey is provided
+  useEffect(() => {
+    if (initialPasskey && validatePasskey(initialPasskey)) {
+      onSubmit(initialPasskey);
+    }
+  }, [initialPasskey, onSubmit]);
+  
+  const validatePasskey = (key) => {
+    const passkeyRegex = /^[a-zA-Z0-9]{12}$/;
+    return passkeyRegex.test(key);
+  };
   
   const handleSubmit = (e) => {
     e.preventDefault();
     
     // Validate passkey format
-    const passkeyRegex = /^[a-zA-Z0-9]{12}$/;
-    if (!passkeyRegex.test(passkey)) {
+    if (!validatePasskey(passkey)) {
       setError('Passkey must be exactly 12 alphanumeric characters.');
       return;
     }
