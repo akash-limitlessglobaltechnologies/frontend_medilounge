@@ -609,9 +609,6 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
           // Mark annotations as updated when dragging
           annotationsUpdatedRef.current = true;
         }
-        
-        // Update canvas if needed
-        renderCanvas();
       });
     }
   }, [
@@ -693,13 +690,25 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
 
   // Optimized canvas rendering
   const renderCanvas = useCallback(() => {
-    if (!canvasRef.current || !showAnnotations) return;
+    if (!canvasRef.current || !imageRef.current || !imageLoaded) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
+    // Ensure canvas size matches image size
+    if (canvas.width !== imageRef.current.naturalWidth || canvas.height !== imageRef.current.naturalHeight) {
+      canvas.width = imageRef.current.naturalWidth;
+      canvas.height = imageRef.current.naturalHeight;
+    }
+    
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Only render if annotations should be shown
+    if (!showAnnotations) {
+      canvas.style.cursor = 'default';
+      return;
+    }
     
     // Set cursor based on context
     if (isDrawing) {
@@ -719,6 +728,7 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     
     // Draw each annotation
     annotations.forEach(annotation => {
+      ctx.save();
       ctx.strokeStyle = annotation.color;
       ctx.lineWidth = 2;
       ctx.setLineDash(annotation.locked ? [] : [5, 5]);
@@ -896,6 +906,8 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
           });
         }
       }
+      
+      ctx.restore();
     });
   }, [
     activeAnnotation, 
@@ -903,20 +915,30 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
     isDrawing, 
     isDragging, 
     showAnnotations, 
-    calculateArea
+    calculateArea,
+    imageLoaded
   ]);
 
-  // Re-render canvas when critical state changes
+  // Force canvas update when annotations change
   useEffect(() => {
     renderCanvas();
-  }, [
-    annotations, 
-    activeAnnotation, 
-    showAnnotations, 
-    isDrawing, 
-    isDragging, 
-    renderCanvas
-  ]);
+  }, [annotations, activeAnnotation, showAnnotations, isDrawing, isDragging, imageLoaded, renderCanvas]);
+
+  // Also re-render canvas after mouse events
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('mousemove', renderCanvas);
+      canvas.addEventListener('mouseup', renderCanvas);
+      canvas.addEventListener('mousedown', renderCanvas);
+      
+      return () => {
+        canvas.removeEventListener('mousemove', renderCanvas);
+        canvas.removeEventListener('mouseup', renderCanvas);
+        canvas.removeEventListener('mousedown', renderCanvas);
+      };
+    }
+  }, [renderCanvas]);
 
   // Cleanup animation frame on unmount
   useEffect(() => {
@@ -933,8 +955,10 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
       canvasRef.current.width = imageRef.current.naturalWidth;
       canvasRef.current.height = imageRef.current.naturalHeight;
       setImageLoaded(true);
+      // Force render after image loads
+      setTimeout(renderCanvas, 100);
     }
-  }, []);
+  }, [renderCanvas]);
 
   useEffect(() => {
     const img = imageRef.current;
@@ -1025,10 +1049,16 @@ const ImageViewer = ({ onClose, imageUrl: initialImageUrl, imageName: initialIma
                   src={imageUrl} 
                   alt={imageName} 
                   className="max-h-full max-w-full object-contain"
+                  onLoad={handleImageLoad}
                 />
                 <canvas 
                   ref={canvasRef}
                   className="absolute top-0 left-0 w-full h-full pointer-events-auto"
+                  style={{ 
+                    width: '100%', 
+                    height: '100%',
+                    imageRendering: 'crisp-edges'
+                  }}
                   onClick={handleCanvasClick}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
